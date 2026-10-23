@@ -22,6 +22,7 @@ use std::time::Duration;
 pub enum Mode {
     Daemon { restore: bool },
     Snapshot(Snapshot),
+    Demo(crate::demo::Demo),
 }
 
 pub struct Snapshot {
@@ -36,9 +37,9 @@ pub struct Snapshot {
 }
 
 /// Everything the main loop owns.
-struct Daemon {
-    app: gtk::Application,
-    engine: Rc<RefCell<Engine>>,
+pub(crate) struct Daemon {
+    pub(crate) app: gtk::Application,
+    pub(crate) engine: Rc<RefCell<Engine>>,
     gallery: OnceCell<Rc<Gallery>>,
     subscribers: RefCell<Vec<UnixStream>>,
     last_status: RefCell<String>,
@@ -66,7 +67,7 @@ pub fn run(mode: Mode) -> Result<()> {
                     .with_context(|| format!("binding {}", paths.socket.display()))?,
             );
         }
-        Mode::Snapshot(_) => {
+        Mode::Snapshot(_) | Mode::Demo(_) => {
             // Work on a copy of the state, so scripting a screenshot never
             // changes the real gallery's remembered album.
             let dir =
@@ -213,6 +214,7 @@ fn start(
             );
         }
         Mode::Snapshot(shot) => snapshot(&daemon, shot),
+        Mode::Demo(demo) => crate::demo::run(&daemon, demo),
     }
     // Keep the daemon alive for as long as the main loop runs.
     std::mem::forget(daemon);
@@ -220,7 +222,7 @@ fn start(
 }
 
 impl Daemon {
-    fn gallery(&self) -> &Rc<Gallery> {
+    pub(crate) fn gallery(&self) -> &Rc<Gallery> {
         self.gallery.get().expect("gallery is built before anything is dispatched")
     }
 

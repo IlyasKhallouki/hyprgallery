@@ -451,7 +451,7 @@ impl Tile {
         }
         if applying {
             let id = self.add_tick_callback(|tile, clock| {
-                let t = clock.frame_time() as f64 / 1_000_000.0;
+                let t = clock.frame_time() as f64 / 1_000_000.0 / motion::time_scale();
                 tile.imp().spin_phase.set((t * 5.0) % std::f64::consts::TAU);
                 tile.queue_draw();
                 glib::ControlFlow::Continue

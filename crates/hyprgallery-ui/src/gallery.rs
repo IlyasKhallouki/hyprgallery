@@ -2068,6 +2068,44 @@ impl Gallery {
     pub fn thumbnails_pending(&self) -> bool {
         self.all_bound().iter().any(|(_, t)| !t.has_thumb())
     }
+
+    // Scripting hooks. Each does what a key does, so a scripted tour (the
+    // demo recorder) goes through the same code a person at the keyboard
+    // does.
+
+    /// Move the selection by `delta` places, as the arrow keys do.
+    pub fn move_selection(&self, delta: i64) {
+        let n = self.store.n_items() as i64;
+        if n == 0 {
+            return;
+        }
+        let pos = (self.selection.selected() as i64 + delta).clamp(0, n - 1) as u32;
+        self.page().grid.scroll_to(
+            pos,
+            gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT,
+            None,
+        );
+    }
+
+    /// Apply the selected wallpaper, as Enter does.
+    pub fn apply_selected(self: &Rc<Self>) {
+        if let Some(item) = self.selected_item() {
+            self.apply_item(&item);
+        }
+    }
+
+    /// Favourite or unfavourite the selected wallpaper, as F does.
+    pub fn toggle_favourite_selected(self: &Rc<Self>) {
+        if let Some(item) = self.selected_item() {
+            let changes = self.engine.borrow_mut().toggle_favourite(&item.path);
+            (self.dispatch)(changes);
+        }
+    }
+
+    /// Narrow By colour to one hue, or `None` for all, as the hue chips do.
+    pub fn filter_hue(self: &Rc<Self>, hue: Option<Hue>) {
+        self.set_hue(hue);
+    }
 }
 
 fn glyph(id: &ViewId) -> Option<&'static str> {

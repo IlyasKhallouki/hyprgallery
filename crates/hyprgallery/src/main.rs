@@ -4,6 +4,7 @@
 mod bar;
 mod client;
 mod daemon;
+mod demo;
 mod server;
 
 use anyhow::{Context, Result, bail};
@@ -99,6 +100,15 @@ enum Command {
         #[arg(long, default_value_t = 250)]
         type_every_ms: u64,
     },
+    /// Record a scripted tour of the gallery to a video file and exit.
+    #[command(hide = true)]
+    Demo {
+        /// The video to write. Needs ffmpeg.
+        out: PathBuf,
+        /// The wallpaper to draw behind the gallery, as the desktop would.
+        #[arg(long)]
+        desktop: PathBuf,
+    },
 }
 
 fn main() {
@@ -140,6 +150,9 @@ fn run(command: Command) -> Result<()> {
                 type_text,
                 type_every_ms,
             }))
+        }
+        Command::Demo { out, desktop } => {
+            daemon::run(daemon::Mode::Demo(demo::Demo { out, desktop }))
         }
         Command::Bar => bar::run(),
         Command::Toggle { layout } => {

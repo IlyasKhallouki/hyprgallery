@@ -31,6 +31,23 @@ pub fn ease_in_cubic(t: f64) -> f64 {
 
 pub type Ease = fn(f64) -> f64;
 
+/// How many times slower than real time everything moves. 1 in normal use.
+///
+/// Recording the demo sets `HYPRGALLERY_TIME_SCALE`, together with GTK's own
+/// `GTK_SLOWDOWN`, so that a machine which cannot render thirty frames a
+/// second can still record smooth motion: the recorder plays its frames back
+/// that many times faster, at true speed.
+pub fn time_scale() -> f64 {
+    static SCALE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *SCALE.get_or_init(|| {
+        std::env::var("HYPRGALLERY_TIME_SCALE")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|s| s.is_finite())
+            .map_or(1.0, |s| s.clamp(1.0, 20.0))
+    })
+}
+
 /// A number that moves smoothly to wherever it is told.
 pub struct Animated {
     value: Cell<f64>,
@@ -92,7 +109,7 @@ impl Animated {
             return;
         }
         let start = Cell::new(None::<i64>);
-        let duration = ms as f64 * 1000.0;
+        let duration = ms as f64 * 1000.0 * time_scale();
         let done = RefCell::new(Some(Box::new(done) as Box<dyn FnOnce()>));
         let this = Rc::downgrade(self);
         let id = widget.add_tick_callback(move |_, clock| {
@@ -131,6 +148,7 @@ impl Debounce {
     pub fn run(self: &Rc<Self>, ms: u64, f: impl FnOnce() + 'static) {
         self.cancel();
         let this = Rc::downgrade(self);
+        let ms = (ms as f64 * time_scale()) as u64;
         let id = glib::timeout_add_local_once(std::time::Duration::from_millis(ms), move || {
             if let Some(this) = this.upgrade() {
                 this.source.borrow_mut().take();

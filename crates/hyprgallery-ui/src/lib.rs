@@ -15,3 +15,4 @@ mod textures;
 mod tile;
 
 pub use gallery::{Dispatch, Gallery, NAMESPACE};
+pub use motion::time_scale;
