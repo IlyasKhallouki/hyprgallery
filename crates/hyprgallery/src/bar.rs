@@ -33,6 +33,9 @@ pub fn run() -> Result<()> {
                     .and_then(|_| client::wait_for_daemon(Duration::from_secs(8)))
                 {
                     eprintln!("hyprgallery bar: {e:#}");
+                    // Whatever stopped it will not be fixed by trying again
+                    // straight away, and Waybar logs every line of stderr.
+                    std::thread::sleep(Duration::from_secs(5));
                 }
                 continue;
             }

@@ -126,6 +126,24 @@ check "and the last choice is what ends up applied" sh -c "tail -n 1 '$applied' 
 typed=$("$bin" snapshot "$work/typing.png" --type earth --type-every-ms 250 2>/dev/null | grep '^search:' || true)
 check "search keeps what you type, a key at a time" sh -c "printf '%s' '$typed' | grep -qx 'search: \"earth\" (1 results)'"
 
+# An upgrade replaces the binary while the Waybar module keeps running. When
+# the daemon next stops, the module has to start the new binary, not its own
+# deleted one.
+cp "$bin" "$work/hg"
+"$work/hg" bar >/dev/null 2>"$work/bar.err" &
+barpid=$!
+sleep 1
+rm "$work/hg"
+cp "$bin" "$work/hg"
+"$bin" quit
+back=no
+for _ in $(seq 40); do
+  if "$bin" status | grep -q '^backend:'; then back=yes; break; fi
+  sleep 0.25
+done
+kill "$barpid" 2>/dev/null || true
+check "after an upgrade the bar module brings the daemon back" test "$back" = yes
+
 check "quit stops the daemon" "$bin" quit
 sleep 0.3
 check "and status agrees" sh -c "'$bin' status | grep -q 'not running'"

@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use hyprgallery_core::ipc::{self, IpcError, Reply, Request};
 use hyprgallery_core::paths::{self, Paths};
 use std::os::unix::process::CommandExt;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -28,6 +29,9 @@ pub fn not_running(e: &anyhow::Error) -> bool {
 /// Start `hyprgallery daemon` in its own session, logging to the state dir.
 pub fn start_daemon() -> Result<()> {
     let exe = std::env::current_exe().context("finding our own executable")?;
+    let exe = runnable(&exe)
+        .or_else(|| paths::which("hyprgallery"))
+        .with_context(|| format!("{} is gone and hyprgallery is not on PATH", exe.display()))?;
     let log = Paths::from_env().log_file;
     if let Some(dir) = log.parent() {
         std::fs::create_dir_all(dir)?;
@@ -48,6 +52,20 @@ pub fn start_daemon() -> Result<()> {
     Ok(())
 }
 
+/// The executable to start the daemon from.
+///
+/// Upgrading replaces the binary while `hyprgallery bar` keeps running, and
+/// from then on the kernel names our own executable `<path> (deleted)`, which
+/// cannot be started. The new binary at the same path is the one wanted.
+fn runnable(exe: &Path) -> Option<PathBuf> {
+    if exe.is_file() {
+        return Some(exe.to_owned());
+    }
+    let name = exe.to_str()?.strip_suffix(" (deleted)")?;
+    let replaced = PathBuf::from(name);
+    replaced.is_file().then_some(replaced)
+}
+
 pub fn wait_for_daemon(timeout: Duration) -> Result<()> {
     let socket = paths::socket_path();
     let deadline = Instant::now() + timeout;
@@ -59,4 +77,20 @@ pub fn wait_for_daemon(timeout: Duration) -> Result<()> {
     }
     let log = Paths::from_env().log_file;
     anyhow::bail!("the daemon did not start; see {}", log.display())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_upgraded_binary_is_found_at_its_old_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let bin = dir.path().join("hyprgallery");
+        std::fs::write(&bin, b"").unwrap();
+        let deleted = PathBuf::from(format!("{} (deleted)", bin.display()));
+        assert_eq!(runnable(&deleted), Some(bin.clone()));
+        assert_eq!(runnable(&bin), Some(bin));
+        assert_eq!(runnable(&dir.path().join("gone (deleted)")), None);
+    }
 }
