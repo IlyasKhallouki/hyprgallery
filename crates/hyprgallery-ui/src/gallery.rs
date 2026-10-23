@@ -262,7 +262,26 @@ impl Gallery {
         self.root_progress.set(0.0);
         page.content.set_progress(if layout == Layout::Overlay { 0.0 } else { 1.0 });
         self.peek_progress.set(1.0);
+        let asked = std::time::Instant::now();
         self.window.present();
+        // How long from asking to the first frame on screen. The number that
+        // decides whether opening feels instant.
+        if let Some(clock) = self.window.frame_clock() {
+            let handler = std::rc::Rc::new(std::cell::Cell::new(None::<glib::SignalHandlerId>));
+            let h = std::rc::Rc::clone(&handler);
+            let id = clock.connect_after_paint(move |clock| {
+                tracing::debug!(
+                    "first frame {:.1} ms after opening",
+                    asked.elapsed().as_secs_f64() * 1000.0
+                );
+                if let Some(id) = h.take() {
+                    clock.disconnect(id);
+                }
+            });
+            handler.set(Some(id));
+        } else {
+            tracing::debug!("present took {:.1} ms", asked.elapsed().as_secs_f64() * 1000.0);
+        }
         page.grid.grab_focus();
 
         let weak = self.weak();
@@ -282,6 +301,65 @@ impl Gallery {
             || {},
         );
         (self.dispatch)(Vec::new());
+    }
+
+    /// Start the GPU renderer and compile its shaders now, while nobody is
+    /// waiting, instead of on the first click.
+    ///
+    /// The first frame a GTK window ever draws pays for loading the graphics
+    /// driver and compiling every shader it touches, which is seconds on a
+    /// busy machine. Realising the hidden window creates its renderer without
+    /// showing anything (the surface gets no role or buffer until it is
+    /// mapped), and drawing one small offscreen scene with every kind of node
+    /// the gallery uses compiles the shaders it will need.
+    pub fn warm_up(&self) {
+        use gtk::{graphene, gsk};
+        let started = std::time::Instant::now();
+        WidgetExt::realize(&self.window);
+        let Some(renderer) = self.window.native().and_then(|n| n.renderer()) else { return };
+        let rect = graphene::Rect::new(0.0, 0.0, 64.0, 36.0);
+        let snapshot = gtk::Snapshot::new();
+        snapshot.append_color(&gdk::RGBA::BLACK, &rect);
+        snapshot.push_rounded_clip(&gsk::RoundedRect::from_rect(rect, 8.0));
+        snapshot.push_opacity(0.5);
+        let pixels = hyprgallery_core::decode::Rgb8 { width: 4, height: 4, data: vec![128; 48] };
+        let texture = crate::textures::memory_texture(&pixels);
+        snapshot.append_scaled_texture(&texture, gsk::ScalingFilter::Linear, &rect);
+        let stops = [
+            gsk::ColorStop::new(0.0, gdk::RGBA::new(0.0, 0.0, 0.0, 0.0)),
+            gsk::ColorStop::new(1.0, gdk::RGBA::new(0.0, 0.0, 0.0, 0.6)),
+        ];
+        snapshot.append_linear_gradient(
+            &rect,
+            &graphene::Point::new(0.0, 0.0),
+            &graphene::Point::new(0.0, 36.0),
+            &stops,
+        );
+        snapshot.append_radial_gradient(
+            &rect,
+            &graphene::Point::new(32.0, 18.0),
+            30.0,
+            30.0,
+            0.0,
+            1.0,
+            &stops,
+        );
+        let layout = self.window.create_pango_layout(Some("Warm up"));
+        snapshot.append_layout(&layout, &gdk::RGBA::WHITE);
+        snapshot.append_outset_shadow(
+            &gsk::RoundedRect::from_rect(rect, 8.0),
+            &gdk::RGBA::BLACK,
+            0.0,
+            3.0,
+            0.0,
+            8.0,
+        );
+        snapshot.pop();
+        snapshot.pop();
+        if let Some(node) = snapshot.to_node() {
+            let _ = renderer.render_texture(&node, Some(&rect));
+        }
+        tracing::debug!("renderer ready in {:.0} ms", started.elapsed().as_secs_f64() * 1000.0);
     }
 
     pub fn hide(self: &Rc<Self>) {
@@ -663,13 +741,12 @@ impl Gallery {
             while let Some(child) = page.albums.first_child() {
                 page.albums.remove(&child);
             }
-            let mut shown_separator = false;
             for (n, info) in views.iter().enumerate() {
-                if info.smart && !shown_separator && i == 0 && n > 0 {
+                // A divider between the smart albums and your folders.
+                if i == 0 && !info.smart && n > 0 && views[n - 1].smart {
                     let sep = gtk::Box::new(gtk::Orientation::Vertical, 0);
                     sep.add_css_class("hg-separator");
                     page.albums.append(&sep);
-                    shown_separator = true;
                 }
                 let button = if i == 0 { self.album_pill(info) } else { self.album_cover(info) };
                 let weak = self.weak();
@@ -1156,6 +1233,18 @@ impl Gallery {
 
     fn wire_page(self: &Rc<Self>, i: usize) {
         let page = &self.pages[i];
+
+        // A mouse wheel only scrolls vertically, and the album row only
+        // scrolls sideways. Turn one into the other.
+        let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+        let scroller = page.album_scroll.clone();
+        wheel.connect_scroll(move |c, _, dy| {
+            let adj = scroller.hadjustment();
+            let step = if c.unit() == gdk::ScrollUnit::Wheel { 60.0 } else { 1.0 };
+            adj.set_value(adj.value() + dy * step);
+            glib::Propagation::Stop
+        });
+        page.album_scroll.add_controller(wheel);
 
         let weak = self.weak();
         page.grid.connect_activate(move |_, pos| {

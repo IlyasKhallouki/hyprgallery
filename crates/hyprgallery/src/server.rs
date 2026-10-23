@@ -30,7 +30,11 @@ pub struct Lock {
 /// the same moment (Waybar and a key binding, at login) could both see no
 /// answer, and the second would delete the first one's socket.
 pub fn lock(socket: &Path) -> std::io::Result<Option<Lock>> {
-    let path = socket.with_extension("lock");
+    // `hyprgallery.sock.lock`, not `hyprgallery.lock`: Wayland compositors
+    // keep `<display>.lock` files in the same directory and hold a lock on
+    // them, so a display that happened to share our socket's stem would look
+    // exactly like a running daemon.
+    let path = std::path::PathBuf::from(format!("{}.lock", socket.display()));
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }

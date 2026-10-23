@@ -179,6 +179,16 @@ fn start(
                 glib::ControlFlow::Continue
             });
             daemon.watch();
+            // After the first pass of the main loop, so the socket is already
+            // answering by the time this blocks on the graphics driver.
+            let weak = Rc::downgrade(&daemon);
+            glib::idle_add_local_once(move || {
+                if let Some(d) = weak.upgrade()
+                    && !d.gallery().is_shown()
+                {
+                    d.gallery().warm_up();
+                }
+            });
             for signal in [libc::SIGTERM, libc::SIGINT, libc::SIGHUP] {
                 let weak = Rc::downgrade(&daemon);
                 glib_unix::unix_signal_add_local(signal, move || {

@@ -110,33 +110,29 @@ pub fn resolve(
     }
 }
 
-/// Every view worth offering, in the order the album row shows them: your
-/// folders, then the smart albums that have something in them.
+/// Every view worth offering, in the order the album row shows them: the
+/// smart albums first, since they span the whole library and stay put while
+/// folders come and go, then your folders.
 pub fn available(lib: &Library, state: &State, metas: &MetaStore, recent: usize) -> Vec<ViewInfo> {
-    let mut views: Vec<ViewInfo> = lib
-        .albums
-        .iter()
-        .enumerate()
-        .map(|(i, a)| ViewInfo {
-            id: ViewId::Album(a.id()),
-            label: a.name.clone(),
-            count: lib.count(i),
-            smart: false,
-        })
-        .collect();
-    if lib.wallpapers.is_empty() {
-        return views;
+    let mut views = Vec::new();
+    if !lib.wallpapers.is_empty() {
+        let favourites = state.favourites.iter().filter(|p| lib.find(p).is_some()).count();
+        // Favourites is always offered, empty or not, because an empty album
+        // with a hint is how anyone learns favouriting exists.
+        views.push(smart(ViewId::Favourites, "Favourites", favourites));
+        views.push(smart(ViewId::Recent, "Recent", lib.wallpapers.len().min(recent)));
+        views.push(smart(ViewId::Colour, "By colour", lib.wallpapers.len()));
+        let animated = (0..lib.wallpapers.len()).filter(|&i| is_animated(lib, metas, i)).count();
+        if animated > 0 {
+            views.push(smart(ViewId::Animated, "Animated", animated));
+        }
     }
-    let favourites = state.favourites.iter().filter(|p| lib.find(p).is_some()).count();
-    // Favourites is always offered, empty or not, because an empty album with
-    // a hint is how anyone learns favouriting exists.
-    views.push(smart(ViewId::Favourites, "Favourites", favourites));
-    views.push(smart(ViewId::Recent, "Recent", lib.wallpapers.len().min(recent)));
-    views.push(smart(ViewId::Colour, "By colour", lib.wallpapers.len()));
-    let animated = (0..lib.wallpapers.len()).filter(|&i| is_animated(lib, metas, i)).count();
-    if animated > 0 {
-        views.push(smart(ViewId::Animated, "Animated", animated));
-    }
+    views.extend(lib.albums.iter().enumerate().map(|(i, a)| ViewInfo {
+        id: ViewId::Album(a.id()),
+        label: a.name.clone(),
+        count: lib.count(i),
+        smart: false,
+    }));
     views
 }
 
@@ -199,6 +195,8 @@ mod tests {
         let views = available(&lib, &s, &m, 48);
         let fav = views.iter().find(|v| v.id == ViewId::Favourites).unwrap();
         assert_eq!(fav.count, 2);
+        let order: Vec<_> = views.iter().map(|v| v.label.as_str()).collect();
+        assert_eq!(order, ["Favourites", "Recent", "By colour", "Animated", "Space", "City"]);
     }
 
     #[test]

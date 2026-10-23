@@ -117,7 +117,10 @@ fn main() {
 }
 
 fn run(command: Command) -> Result<()> {
-    let quick = Duration::from_secs(5);
+    // Replies are normally immediate. The margin covers a daemon that was
+    // only just started by this very command and is still bringing up its
+    // renderer.
+    let quick = Duration::from_secs(20);
     match command {
         Command::Daemon { no_restore } => {
             daemon::run(daemon::Mode::Daemon { restore: !no_restore })

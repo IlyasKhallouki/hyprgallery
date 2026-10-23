@@ -60,6 +60,15 @@ window#hyprgallery.background {
   font-feature-settings: "tnum";
 }
 
+/* Fade the album row's edges where there is more to scroll to. */
+scrolledwindow.hg-albums > undershoot.left {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.55), transparent 48px);
+}
+
+scrolledwindow.hg-albums > undershoot.right {
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.55), transparent 48px);
+}
+
 .hg-separator {
   min-width: 1px;
   margin: 6px 10px 6px 2px;
