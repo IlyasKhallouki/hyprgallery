@@ -18,7 +18,7 @@ pub struct Rgb8 {
 
 impl Rgb8 {
     pub fn pixels(&self) -> impl Iterator<Item = [u8; 3]> + '_ {
-        self.data.chunks_exact(3).map(|p| [p[0], p[1], p[2]])
+        self.data.as_chunks::<3>().0.iter().copied()
     }
 }
 
@@ -88,10 +88,12 @@ fn load_jpeg(path: &Path, want_w: u32, want_h: u32) -> Result<(Rgb8, Decoded), D
         jpeg_decoder::PixelFormat::RGB24 => raw,
         jpeg_decoder::PixelFormat::L8 => raw.iter().flat_map(|&v| [v, v, v]).collect(),
         jpeg_decoder::PixelFormat::L16 => {
-            raw.chunks_exact(2).flat_map(|v| [v[0], v[0], v[0]]).collect()
+            raw.as_chunks::<2>().0.iter().flat_map(|v| [v[0]; 3]).collect()
         }
         jpeg_decoder::PixelFormat::CMYK32 => raw
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|p| {
                 let k = 255 - p[3] as u32;
                 let f = |c: u8| ((255 - c as u32) * (255 - k) / 255) as u8;
