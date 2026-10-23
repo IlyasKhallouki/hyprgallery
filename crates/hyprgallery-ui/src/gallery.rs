@@ -67,6 +67,7 @@ pub struct Gallery {
     drop_zone: gtk::Revealer,
     drop_label: gtk::Label,
     peek_progress: Rc<Animated>,
+    grid_fade: Rc<Animated>,
     peeking: Cell<bool>,
     media: RefCell<Option<gtk::MediaFile>>,
     pointer: Cell<Option<(f64, f64)>>,
@@ -185,6 +186,7 @@ impl Gallery {
             drop_zone,
             drop_label,
             peek_progress: Animated::new(1.0),
+            grid_fade: Animated::new(1.0),
             peeking: Cell::new(false),
             media: RefCell::new(None),
             pointer: Cell::new(None),
@@ -233,8 +235,11 @@ impl Gallery {
 
     pub fn show(self: &Rc<Self>, layout: Option<Layout>) {
         let layout = layout.unwrap_or_else(|| self.engine.borrow().config.layout);
-        if self.shown.get() && layout != self.layout.get() {
-            // Changing the surface's exclusive zone needs a fresh map.
+        // Changing the surface's exclusive zone needs a fresh map. Checked
+        // against the window rather than `shown`, which is already false while
+        // a close is still fading out.
+        if self.window.is_visible() && layout != self.layout.get() {
+            self.root_progress.set(0.0);
             self.window.set_visible(false);
             self.shown.set(false);
         }
@@ -249,6 +254,11 @@ impl Gallery {
         self.engine.borrow_mut().visible = true;
 
         // Open on whatever is on screen now, inside the album it came from.
+        // Something else may have changed the wallpaper since last time.
+        let synced = self.engine.borrow_mut().sync_current();
+        if !synced.is_empty() {
+            (self.dispatch)(synced);
+        }
         let current = self.engine.borrow().state.current.clone();
         self.select_path(current.as_deref(), true);
         self.settle_focus(false);
@@ -586,32 +596,33 @@ impl Gallery {
     /// Fill the grid for the current view, search and colour filter.
     fn refill(self: &Rc<Self>, keep: Option<PathBuf>, animate: bool) {
         if animate && self.shown.get() {
+            // The fade lives in a field: an animation only holds a weak
+            // reference to its value, so a local would be dropped before its
+            // first frame and the refill at the end would never run. One
+            // shared value also means a second quick switch takes over the
+            // fade instead of stacking another refill on top.
             let weak = self.weak();
-            let anim = Animated::new(1.0);
-            let page = self.page();
-            let grid_motion = page.grid_motion.clone();
+            let grid_motion = self.page().grid_motion.clone();
             let gm = grid_motion.clone();
-            anim.animate(
+            self.grid_fade.animate(
                 &grid_motion,
                 0.0,
                 90,
                 motion::ease_in_cubic,
                 move |p| gm.set_progress(p),
                 move || {
-                    if let Some(g) = weak.upgrade() {
-                        g.refill(keep, false);
-                        let gm = g.page().grid_motion.clone();
-                        let anim = Animated::new(0.0);
-                        let gm2 = gm.clone();
-                        anim.animate(
-                            &gm,
-                            1.0,
-                            220,
-                            motion::ease_out_cubic,
-                            move |p| gm2.set_progress(p),
-                            || {},
-                        );
-                    }
+                    let Some(g) = weak.upgrade() else { return };
+                    g.refill(keep, false);
+                    let gm = g.page().grid_motion.clone();
+                    let gm2 = gm.clone();
+                    g.grid_fade.animate(
+                        &gm,
+                        1.0,
+                        220,
+                        motion::ease_out_cubic,
+                        move |p| gm2.set_progress(p),
+                        || {},
+                    );
                 },
             );
             return;
@@ -692,7 +703,11 @@ impl Gallery {
                 for page in &self.pages {
                     page.search.set_text("");
                 }
-                self.view.replace(view);
+                self.hue.set(None);
+                self.view.replace(view.clone());
+                self.engine.borrow_mut().set_view(view);
+                self.rebuild_hues();
+                self.update_rotate();
                 self.refill(Some(path.to_owned()), false);
             }
         }
@@ -906,7 +921,7 @@ impl Gallery {
             for (hue, _) in &present {
                 let label = gtk::Label::new(None);
                 label.set_markup(&format!(
-                    "<span foreground=\"{}\">\u{25CF}</span>  {}",
+                    "<span foreground=\"{}\" size=\"large\">\u{25CF}</span> {}",
                     hue.swatch().hex(),
                     hue.label()
                 ));

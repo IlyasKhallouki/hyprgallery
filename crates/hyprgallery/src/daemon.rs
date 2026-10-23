@@ -257,7 +257,31 @@ impl Daemon {
             }
         }
         let changes = self.engine.borrow_mut().handle(event);
+        self.settle_sets(&changes);
         self.dispatch(changes);
+    }
+
+    /// Answer every `set` whose wallpaper is no longer on its way: replaced
+    /// in the queue by a later choice, or failed before it could start. Its
+    /// client would otherwise wait out the whole timeout for a reply that is
+    /// never coming.
+    fn settle_sets(&self, changes: &[Change]) {
+        let error = changes.iter().find_map(|c| match c {
+            Change::Error(e) => Some(e.clone()),
+            _ => None,
+        });
+        let engine = self.engine.borrow();
+        let mut pending = self.pending_sets.borrow_mut();
+        let (keep, gone): (Vec<_>, Vec<_>) =
+            pending.drain(..).partition(|(p, _)| engine.is_pending(p));
+        *pending = keep;
+        for (_, reply) in gone {
+            let _ = reply.send(Reply::error(
+                error
+                    .clone()
+                    .unwrap_or_else(|| "replaced by a later choice before it was applied".into()),
+            ));
+        }
     }
 
     fn request(self: &Rc<Self>, incoming: Incoming) {
@@ -301,6 +325,8 @@ impl Daemon {
                 } else {
                     self.pending_sets.borrow_mut().push((path, reply));
                 }
+                // This may have pushed an earlier `set` out of the queue.
+                self.settle_sets(&[]);
                 self.dispatch(changes);
             }
             // Each result is bound before it is handled, so the engine borrow
@@ -470,41 +496,51 @@ fn is_partial(path: &Path) -> bool {
         || name.contains(".tmp.")
 }
 
-/// Open the gallery, wait for every visible thumbnail, then save a PNG.
+/// Open the gallery, switch to the requested album the way a click would,
+/// wait for every visible thumbnail, then save a PNG.
+///
+/// The album is switched after opening, not before, so the animated switch
+/// that a user triggers is the path that gets exercised.
 fn snapshot(daemon: &Rc<Daemon>, shot: Snapshot) {
     let gallery = Rc::clone(daemon.gallery());
-    if let Some(view) = &shot.view
-        && !gallery.set_view_named(view)
-    {
-        eprintln!("hyprgallery: no album called `{view}`");
-    }
     gallery.show(Some(shot.layout));
     gallery.window.fullscreen();
     let weak: Weak<Daemon> = Rc::downgrade(daemon);
     let started = std::time::Instant::now();
     let stage = Rc::new(std::cell::Cell::new(0u8));
+    let settled = Rc::new(std::cell::Cell::new(0u8));
     glib::timeout_add_local(Duration::from_millis(250), move || {
         let Some(d) = weak.upgrade() else { return glib::ControlFlow::Break };
         let g = Rc::clone(d.gallery());
         let indexing = d.engine.borrow().status().indexing.is_some();
         let timed_out = started.elapsed() > Duration::from_secs(600);
+        let ready = (!indexing && !g.thumbnails_pending()) || timed_out;
         match stage.get() {
-            0 if (!indexing
-                && !g.thumbnails_pending()
-                && started.elapsed() > Duration::from_millis(1500))
-                || timed_out =>
-            {
-                if let Some(pos) = shot.select {
-                    g.select_index(pos);
-                }
-                if shot.peek {
-                    g.start_peek();
+            // Opened, and everything on screen has its thumbnail.
+            0 if ready && started.elapsed() > Duration::from_millis(1200) => {
+                if let Some(view) = &shot.view
+                    && !g.set_view_named(view)
+                {
+                    eprintln!("hyprgallery: no album called `{view}`");
                 }
                 stage.set(1);
             }
-            1 => stage.set(2),
+            // The switch has faded out, refilled and faded back in.
+            1 if ready => {
+                settled.set(settled.get() + 1);
+                if settled.get() >= 3 {
+                    if let Some(pos) = shot.select {
+                        g.select_index(pos);
+                    }
+                    if shot.peek {
+                        g.start_peek();
+                    }
+                    stage.set(2);
+                }
+            }
             2 => stage.set(3),
-            3 => {
+            3 => stage.set(4),
+            4 => {
                 match g.save_png(&shot.out) {
                     Ok(()) => println!("{}", shot.out.display()),
                     Err(e) => eprintln!("hyprgallery: {e:#}"),

@@ -33,6 +33,9 @@ enum Job {
 struct Done {
     id: String,
     texture: Option<gdk::Texture>,
+    /// A peek job that was skipped because focus had moved on. Its waiters
+    /// belong to a newer job for the same image, so this result is not theirs.
+    skipped: bool,
 }
 
 type Waiter = Box<dyn FnOnce(Option<gdk::Texture>)>;
@@ -132,6 +135,9 @@ impl Loader {
     }
 
     fn finish(&self, done: Done) {
+        if done.skipped {
+            return;
+        }
         if let Some(texture) = &done.texture {
             self.caches.borrow_mut()[cache_of(&done.id)].put(done.id.clone(), texture.clone());
         }
@@ -211,8 +217,15 @@ impl Loader {
             then(Some(texture));
             return;
         }
+        // Already on its way: wait for that job. Starting a new generation
+        // here would make the job in flight skip itself, with nobody left to
+        // answer.
+        if let Some(waiters) = self.waiting.borrow_mut().get_mut(&id) {
+            waiters.push(Box::new(then));
+            return;
+        }
         let generation = self.peek_generation.fetch_add(1, Ordering::SeqCst) + 1;
-        self.waiting.borrow_mut().retain(|k, _| !k.starts_with('p') || *k == id);
+        self.waiting.borrow_mut().retain(|k, _| !k.starts_with('p'));
         self.request(id.clone(), || Job::Peek { id, path, kind, size, generation }, true, then);
     }
 }
@@ -234,30 +247,30 @@ fn spawn_worker(
                         Err(_) => return,
                     }
                 };
-                let (id, texture) = match job {
+                let (id, texture, skipped) = match job {
                     Job::Thumb { id, path } => {
                         let texture = std::fs::read(&path).ok().and_then(|bytes| {
                             gdk::Texture::from_bytes(&glib::Bytes::from_owned(bytes)).ok()
                         });
-                        (id, texture)
+                        (id, texture, false)
                     }
                     Job::Backdrop { id, meta } => {
-                        (id, meta.backdrop().map(|img| memory_texture(&img)))
+                        (id, meta.backdrop().map(|img| memory_texture(&img)), false)
                     }
                     Job::Peek { id, path, kind, size, generation } => {
                         // Focus moved on while this waited. Skip the decode.
                         if peek_generation.load(Ordering::SeqCst) != generation {
-                            (id, None)
+                            (id, None, true)
                         } else {
                             let texture =
                                 decode::load(&path, kind, size.0, size.1).ok().map(|(img, _)| {
                                     memory_texture(&decode::cover(&img, size.0, size.1))
                                 });
-                            (id, texture)
+                            (id, texture, false)
                         }
                     }
                 };
-                if done.send_blocking(Done { id, texture }).is_err() {
+                if done.send_blocking(Done { id, texture, skipped }).is_err() {
                     return;
                 }
             }

@@ -121,6 +121,12 @@ impl Engine {
         self.applying.as_deref() == Some(path)
     }
 
+    /// Being applied now, or waiting its turn. Anything else that was asked
+    /// for has either finished or been replaced by a later choice.
+    pub fn is_pending(&self, path: &Path) -> bool {
+        self.is_applying(path) || self.queued.as_ref().is_some_and(|(p, _)| p == path)
+    }
+
     pub fn failed(&self, key: &str) -> bool {
         self.failed.contains(key)
     }

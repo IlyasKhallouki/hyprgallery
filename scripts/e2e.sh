@@ -96,6 +96,31 @@ make_image "$work/walls/Forest/pine.png" "green-black" green
 sleep 1.5
 check "new folders are picked up without reindexing" sh -c "'$bin' random --album Forest && sleep 0.5 && grep -qx '$work/walls/Forest/pine.png' '$applied'"
 
+# A slow backend, so three quick `set`s overlap. The first applies, the
+# second is replaced in the queue and must say so at once rather than hang,
+# and the third applies after the first. The daemon reloads its config on
+# save, so this needs no restart.
+cat >"$XDG_CONFIG_HOME/hyprgallery/config.toml" <<EOF
+backend = "command"
+command = "sleep 1; printf '%s\\\\n' {path} >> '$applied'"
+restore_on_start = false
+[library]
+roots = ["$work/walls"]
+hyde_themes = false
+EOF
+sleep 1
+"$bin" set "$work/walls/City/neon.png" &
+first=$!
+sleep 0.3
+"$bin" set "$work/walls/loose.png" >"$work/second.txt" 2>&1 &
+second=$!
+sleep 0.3
+"$bin" set "$work/walls/Space/earth.png"
+wait "$first" || true
+wait "$second" || true
+check "a set replaced in the queue is told so" grep -q 'replaced by a later choice' "$work/second.txt"
+check "and the last choice is what ends up applied" sh -c "tail -n 1 '$applied' | grep -qx '$work/walls/Space/earth.png'"
+
 check "quit stops the daemon" "$bin" quit
 sleep 0.3
 check "and status agrees" sh -c "'$bin' status | grep -q 'not running'"
