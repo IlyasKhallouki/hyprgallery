@@ -22,8 +22,9 @@ commands that ask the daemon to do things.
 
 ## Crates
 
-**`hyprgallery-core`** has no GTK dependency. It holds everything that can be
-tested without a display:
+### hyprgallery-core
+
+No GTK dependency. It holds everything that can be tested without a display:
 
 - `library`: scans the configured folders. Each folder holding images is an
   album; files directly in a root form an album named after the root; on HyDE,
@@ -47,11 +48,15 @@ tested without a display:
   threads and comes back as `Event`s; every mutation returns the `Change`s it
   caused.
 
-**`hyprgallery-ui`** is the GTK4 window. It reads from the engine to draw and
+### hyprgallery-ui
+
+The GTK4 window. It reads from the engine to draw and
 calls the engine to act, then hands the resulting changes to a `Dispatch`
 callback supplied by the daemon.
 
-**`hyprgallery`** is the binary: the CLI, the socket server, the Waybar module,
+### hyprgallery
+
+The binary: the CLI, the socket server, the Waybar module,
 and the daemon that wires the engine and the window together on GTK's main
 loop.
 
@@ -60,11 +65,11 @@ loop.
 One layer surface (namespace `hyprgallery`) on the overlay layer, anchored to
 all four edges, holds both layouts in a stack:
 
-- **Overlay**: exclusive zone -1, so it covers the bar too. A backdrop widget
+- The overlay has exclusive zone -1, so it covers the bar too. A backdrop widget
   draws the focused wallpaper's blurred copy across the screen and crossfades
   as focus moves; peeking (holding Space) fades in a full-resolution decode of
   the real image and fades the interface out.
-- **Popover**: exclusive zone 0, so the bar stays clickable. A panel sits at the
+- The popover has exclusive zone 0, so the bar stays clickable. A panel sits at the
   configured corner; the transparent rest of the surface closes it when
   clicked.
 
