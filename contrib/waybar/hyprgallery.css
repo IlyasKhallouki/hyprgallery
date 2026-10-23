@@ -1,0 +1,27 @@
+/* Optional styling for the hyprgallery Waybar module. Every state the module
+ * can be in is a class: idle, rotating, applying, error, offline, and open
+ * while the gallery is on screen.
+ *
+ * Waybar uses GTK3 CSS, where a rule it cannot parse stops the whole bar from
+ * starting. Keep edits to plain colours and properties GTK3 knows. */
+
+#custom-hyprgallery {
+  padding: 0 8px;
+  transition: color 200ms ease-out;
+}
+
+#custom-hyprgallery.open {
+  color: #f5c2e7;
+}
+
+#custom-hyprgallery.applying {
+  opacity: 0.6;
+}
+
+#custom-hyprgallery.error {
+  color: #f38ba8;
+}
+
+#custom-hyprgallery.offline {
+  opacity: 0.35;
+}

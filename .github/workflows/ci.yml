@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  # The library scan, thumbnails, state, backends and protocol have no
+  # graphical dependencies, which is the point of keeping hyprgallery-core free
+  # of GTK. They are checked on their own so a missing system library can never
+  # be the reason the logic looks broken.
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy -p hyprgallery-core --all-targets
+
+      # ffmpeg so the video thumbnail path is exercised rather than skipped.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Test
+        run: cargo test -p hyprgallery-core
+
+  # The gallery and the binary need GTK4 and gtk4-layer-shell.
+  gui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install GTK4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev meson ninja-build libwayland-dev wayland-protocols
+
+      # Ubuntu does not package gtk4-layer-shell. Building it takes about a
+      # minute. Pinned to the version developed against.
+      - name: Build gtk4-layer-shell
+        run: |
+          git clone --depth 1 --branch v1.3.0 \
+            https://github.com/wmww/gtk4-layer-shell /tmp/gtk4-layer-shell
+          cd /tmp/gtk4-layer-shell
+          meson setup -Dexamples=false -Ddocs=false -Dtests=false \
+            -Dintrospection=false -Dvapi=false build
+          ninja -C build
+          sudo ninja -C build install
+          sudo ldconfig
+
+      - name: Clippy
+        run: cargo clippy -p hyprgallery-ui -p hyprgallery --all-targets
+
+      - name: Test
+        run: cargo test -p hyprgallery
+
+      - name: Build
+        run: cargo build --release -p hyprgallery
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the core on the minimum supported Rust version
+        run: cargo build -p hyprgallery-core

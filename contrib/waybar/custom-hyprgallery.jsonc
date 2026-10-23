@@ -1,0 +1,25 @@
+// hyprgallery module for Waybar.
+//
+// Drop this into your Waybar config, or into a file your config `include`s,
+// then add "custom/hyprgallery" to one of your modules-* arrays.
+//
+// There is no "interval". `hyprgallery bar` stays running and prints a line
+// whenever something changes, and it starts the daemon if nothing else has.
+{
+  "custom/hyprgallery": {
+    "exec": "hyprgallery bar",
+    "return-type": "json",
+
+    // Waybar keeps showing a module's last output after its process exits.
+    // This restarts it a second later instead of leaving it frozen.
+    "restart-interval": 1,
+
+    // Left click: the full-screen gallery. Right click: the smaller panel that
+    // hangs from the bar. Both are the same gallery; `layout` in config.toml
+    // decides which one plain `hyprgallery toggle` opens.
+    "on-click": "hyprgallery toggle --layout overlay",
+    "on-click-right": "hyprgallery toggle --layout popover",
+
+    "tooltip": true
+  }
+}

@@ -1,0 +1,61 @@
+# Maintainer: Ilyas Khallouki <khalloukielias@gmail.com>
+#
+# Builds from a release tag. For the git version, change to hyprgallery-git,
+# source from the repository, and add a pkgver() function.
+pkgname=hyprgallery
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Wallpaper gallery for Hyprland and Waybar: albums from your folders, full-screen picker, live preview"
+arch=('x86_64' 'aarch64')
+url="https://github.com/IlyasKhallouki/hyprgallery"
+license=('MIT')
+depends=('gtk4' 'gtk4-layer-shell')
+makedepends=('cargo')
+optdepends=(
+  'awww: animated transitions (or swww)'
+  'hyprpaper: a supported wallpaper backend'
+  'swaybg: a supported wallpaper backend'
+  'mpvpaper: video wallpapers'
+  'ffmpeg: thumbnails for video wallpapers'
+  'gst-plugins-good: playing GIF and video previews in the gallery'
+  'gst-libav: playing GIF and video previews in the gallery'
+  'waybar: the bar module'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  # Fetch dependencies up front so build() can run offline, which is what a
+  # clean chroot build expects.
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release --package hyprgallery
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen --package hyprgallery-core --package hyprgallery
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm0755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+  install -Dm0644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm0644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm0644 docs/THEMING.md "$pkgdir/usr/share/doc/$pkgname/THEMING.md"
+  install -Dm0644 docs/ARCHITECTURE.md "$pkgdir/usr/share/doc/$pkgname/ARCHITECTURE.md"
+  install -Dm0644 contrib/waybar/custom-hyprgallery.jsonc \
+    "$pkgdir/usr/share/doc/$pkgname/custom-hyprgallery.jsonc"
+  install -Dm0644 contrib/waybar/hyprgallery.css \
+    "$pkgdir/usr/share/doc/$pkgname/hyprgallery.css"
+  install -Dm0644 contrib/hyprland/hyprgallery.conf \
+    "$pkgdir/usr/share/doc/$pkgname/hyprgallery.conf"
+}
