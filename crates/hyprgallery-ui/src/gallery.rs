@@ -78,6 +78,9 @@ pub struct Gallery {
     menu_target: RefCell<Option<PathBuf>>,
     shuffle: Cell<bool>,
     refilling: Cell<bool>,
+    /// Set while the gallery itself changes a search box's text, so the
+    /// change is not mistaken for typing.
+    setting_search: Cell<bool>,
 }
 
 impl Gallery {
@@ -197,6 +200,7 @@ impl Gallery {
             menu_target: RefCell::new(None),
             shuffle: Cell::new(false),
             refilling: Cell::new(false),
+            setting_search: Cell::new(false),
         });
 
         for (factory, min_width) in factories.iter().zip([262, 200]) {
@@ -252,6 +256,8 @@ impl Gallery {
         self.layout.set(layout);
         self.configure_surface(layout);
         let page = self.page();
+        let query = self.query.borrow().clone();
+        self.set_search_text(&query);
         self.stack.set_visible_child(&page.root);
         self.shown.set(true);
         self.engine.borrow_mut().visible = true;
@@ -684,6 +690,18 @@ impl Gallery {
         (0..self.store.n_items()).find(|&i| self.item_at(i).is_some_and(|it| it.path == path))
     }
 
+    /// Set both search boxes without it counting as a search.
+    fn set_search_text(&self, text: &str) {
+        self.setting_search.set(true);
+        for page in &self.pages {
+            if page.search.text() != text {
+                page.search.set_text(text);
+                page.search.set_position(-1);
+            }
+        }
+        self.setting_search.set(false);
+    }
+
     /// Select `path`, switching to its album if it is not in the current view.
     fn select_path(self: &Rc<Self>, path: Option<&Path>, switch_view: bool) {
         let Some(path) = path else {
@@ -703,9 +721,7 @@ impl Gallery {
             };
             if let Some(view) = album {
                 self.query.replace(String::new());
-                for page in &self.pages {
-                    page.search.set_text("");
-                }
+                self.set_search_text("");
                 self.hue.set(None);
                 self.view.replace(view.clone());
                 self.engine.borrow_mut().set_view(view);
@@ -957,11 +973,7 @@ impl Gallery {
             return;
         }
         self.query.replace(String::new());
-        for page in &self.pages {
-            if !page.search.text().is_empty() {
-                page.search.set_text("");
-            }
-        }
+        self.set_search_text("");
         self.hue.set(None);
         self.view.replace(view.clone());
         self.engine.borrow_mut().set_view(view);
@@ -1276,16 +1288,19 @@ impl Gallery {
         let weak = self.weak();
         page.search.connect_search_changed(move |entry| {
             let Some(g) = weak.upgrade() else { return };
+            // Only the box on screen is being typed in. The other one is
+            // brought up to date when the layout switches, never while you
+            // type: replacing an entry's text empties it for a moment, the
+            // search entry reports an empty box at once, and copying that back
+            // wipes the box you are typing in.
+            if g.setting_search.get() || *entry != g.page().search {
+                return;
+            }
             let text = entry.text().to_string();
             if *g.query.borrow() == text {
                 return;
             }
-            g.query.replace(text.clone());
-            for other in &g.pages {
-                if other.search != *entry && other.search.text() != text {
-                    other.search.set_text(&text);
-                }
-            }
+            g.query.replace(text);
             g.refill(None, false);
         });
 
@@ -1998,6 +2013,50 @@ impl Gallery {
             .render_texture(&node, Some(&gtk::graphene::Rect::new(0.0, 0.0, w as f32, h as f32)));
         texture.save_to_png(path)?;
         Ok(())
+    }
+
+    /// Type into the search box one character at a time, the way a person
+    /// does, then report what the box holds. For scripted checks.
+    ///
+    /// Characters go in through the text widget's own insert-at-cursor
+    /// signal, so they land wherever the cursor is, exactly like key presses.
+    /// `done` gets the box's final text and the number of results.
+    pub fn type_into_search(
+        self: &Rc<Self>,
+        text: &str,
+        every_ms: u64,
+        done: impl FnOnce(String, u32) + 'static,
+    ) {
+        let page = self.page();
+        page.search.grab_focus();
+        let mut child = page.search.first_child();
+        let mut field = None;
+        while let Some(c) = child {
+            child = c.next_sibling();
+            if let Ok(t) = c.downcast::<gtk::Text>() {
+                field = Some(t);
+            }
+        }
+        let Some(field) = field else { return done(String::new(), 0) };
+        let chars: Vec<char> = text.chars().collect();
+        for (i, ch) in chars.iter().enumerate() {
+            let field = field.clone();
+            let ch = ch.to_string();
+            glib::timeout_add_local_once(
+                std::time::Duration::from_millis(every_ms * i as u64 + 50),
+                move || {
+                    field.emit_by_name::<()>("insert-at-cursor", &[&ch]);
+                },
+            );
+        }
+        // Long enough after the last key for the search to have run.
+        let settle = every_ms * chars.len() as u64 + 600;
+        let weak = self.weak();
+        glib::timeout_add_local_once(std::time::Duration::from_millis(settle), move || {
+            if let Some(g) = weak.upgrade() {
+                done(g.page().search.text().to_string(), g.store.n_items());
+            }
+        });
     }
 
     /// Select by position, for scripted snapshots.

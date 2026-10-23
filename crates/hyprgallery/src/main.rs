@@ -93,6 +93,11 @@ enum Command {
         select: Option<u32>,
         #[arg(long)]
         peek: bool,
+        /// Type this into the search box first, one key at a time.
+        #[arg(long = "type")]
+        type_text: Option<String>,
+        #[arg(long, default_value_t = 250)]
+        type_every_ms: u64,
     },
 }
 
@@ -125,13 +130,15 @@ fn run(command: Command) -> Result<()> {
         Command::Daemon { no_restore } => {
             daemon::run(daemon::Mode::Daemon { restore: !no_restore })
         }
-        Command::Snapshot { out, layout, view, select, peek } => {
+        Command::Snapshot { out, layout, view, select, peek, type_text, type_every_ms } => {
             daemon::run(daemon::Mode::Snapshot(daemon::Snapshot {
                 out,
                 layout,
                 view,
                 select,
                 peek,
+                type_text,
+                type_every_ms,
             }))
         }
         Command::Bar => bar::run(),

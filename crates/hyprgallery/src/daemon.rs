@@ -30,6 +30,9 @@ pub struct Snapshot {
     pub view: Option<String>,
     pub select: Option<u32>,
     pub peek: bool,
+    /// Type this into the search box before saving, a key at a time.
+    pub type_text: Option<String>,
+    pub type_every_ms: u64,
 }
 
 /// Everything the main loop owns.
@@ -535,7 +538,18 @@ fn snapshot(daemon: &Rc<Daemon>, shot: Snapshot) {
                     if shot.peek {
                         g.start_peek();
                     }
-                    stage.set(2);
+                    match &shot.type_text {
+                        Some(text) => {
+                            // Waits here until the typing is done.
+                            stage.set(9);
+                            let stage = Rc::clone(&stage);
+                            g.type_into_search(text, shot.type_every_ms, move |text, results| {
+                                println!("search: {text:?} ({results} results)");
+                                stage.set(2);
+                            });
+                        }
+                        None => stage.set(2),
+                    }
                 }
             }
             2 => stage.set(3),

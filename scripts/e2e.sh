@@ -121,6 +121,11 @@ wait "$second" || true
 check "a set replaced in the queue is told so" grep -q 'replaced by a later choice' "$work/second.txt"
 check "and the last choice is what ends up applied" sh -c "tail -n 1 '$applied' | grep -qx '$work/walls/Space/earth.png'"
 
+# Typing at a person's pace, slower than the search delay, so a search runs
+# between keys. The box must keep exactly what was typed.
+typed=$("$bin" snapshot "$work/typing.png" --type earth --type-every-ms 250 2>/dev/null | grep '^search:' || true)
+check "search keeps what you type, a key at a time" sh -c "printf '%s' '$typed' | grep -qx 'search: \"earth\" (1 results)'"
+
 check "quit stops the daemon" "$bin" quit
 sleep 0.3
 check "and status agrees" sh -c "'$bin' status | grep -q 'not running'"
