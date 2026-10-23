@@ -2,12 +2,14 @@
 
 A wallpaper gallery for Hyprland and Waybar.
 
+![A tour of hyprgallery: albums, colour filters and search](docs/images/demo.gif)
+
 Point it at a folder of wallpapers and every folder inside it becomes an album.
 Click the bar icon and the gallery fills the screen. Its background turns into a
 soft blur of whichever wallpaper you are looking at, holding Space shows that
 wallpaper sharp and full size, and a click applies it.
 
-![The full-screen gallery, browsing an album](docs/images/overlay.png)
+![The full-screen gallery, browsing an album](docs/images/overlay.jpg)
 
 Written in Rust with GTK4 and gtk4-layer-shell. It drives the wallpaper program
 you already use: HyDE's scripts, awww, swww, hyprpaper, swaybg, or mpvpaper for
@@ -44,7 +46,7 @@ look before you commit. Nothing on your desktop changes until you click.
 - A Waybar module shows what is going on and opens the gallery, and a command
   line covers scripts and key bindings.
 
-![The popover layout under the bar](docs/images/popover.png)
+![The popover layout under the bar](docs/images/popover.jpg)
 
 ## Install
 
@@ -148,7 +150,7 @@ while the gallery is running.
 Clicking anywhere outside the grid closes the gallery. Dropping image files on it
 copies them into the album on screen.
 
-![Holding Space shows the wallpaper full size](docs/images/peek.png)
+![Holding Space shows the wallpaper full size](docs/images/peek.jpg)
 
 ## How wallpapers are applied
 
