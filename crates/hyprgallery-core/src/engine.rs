@@ -104,6 +104,7 @@ impl Engine {
             last_error: None,
             visible: false,
         };
+        engine.sync_current();
         engine.rescan();
         engine
     }
@@ -369,6 +370,35 @@ impl Engine {
         self.save_state();
         changes.push(Change::Rotation);
         changes
+    }
+
+    /// Learn what the backend is showing now, when it can say.
+    ///
+    /// Wallpapers also get changed outside hyprgallery: HyDE's own picker, a
+    /// key binding, a script. Without this the gallery would open on, and mark
+    /// as current, whatever it last set itself.
+    pub fn sync_current(&mut self) -> Vec<Change> {
+        if self.applying.is_some() {
+            return Vec::new();
+        }
+        let shown = match &self.backend {
+            // HyDE keeps the current wallpaper as a symlink; reading it costs
+            // nothing, which matters because this runs every time the gallery
+            // opens.
+            Ok(Backend::Hyde) => {
+                std::fs::canonicalize(crate::paths::cache_home().join("hyde/wall.set")).ok()
+            }
+            Ok(Backend::Awww { bin }) => backend::awww_current(bin).into_iter().next(),
+            _ => None,
+        };
+        match shown {
+            Some(path) if self.state.current.as_ref() != Some(&path) && path.is_file() => {
+                self.state.set_current(&path);
+                self.save_state();
+                vec![Change::Current]
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// Put the last wallpaper back, unless the backend does that itself or is

@@ -75,6 +75,10 @@ pub fn config_home() -> PathBuf {
     xdg("XDG_CONFIG_HOME", ".config")
 }
 
+pub fn cache_home() -> PathBuf {
+    xdg("XDG_CACHE_HOME", ".cache")
+}
+
 /// The user's Pictures directory, as `xdg-user-dirs` has it.
 ///
 /// Read from `user-dirs.dirs` directly rather than by running `xdg-user-dir`,
