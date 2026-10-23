@@ -1,0 +1,11 @@
+/target
+*.profraw
+.direnv/
+result
+result-*
+
+# Editor and OS noise
+.idea/
+.vscode/
+*.swp
+.DS_Store
