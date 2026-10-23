@@ -1,0 +1,30 @@
+[package]
+name = "hyprgallery"
+description = "A wallpaper gallery for Hyprland and Waybar: albums from your folders, a full-screen picker, live preview."
+readme = "../../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-channel.workspace = true
+clap.workspace = true
+glib-unix.workspace = true
+gtk4.workspace = true
+hyprgallery-core.workspace = true
+hyprgallery-ui.workspace = true
+libc.workspace = true
+notify.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

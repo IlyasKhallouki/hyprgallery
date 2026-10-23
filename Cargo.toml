@@ -24,6 +24,8 @@ base64 = "0.22"
 blake3 = "1"
 clap = { version = "4", features = ["derive", "env"] }
 fast_image_resize = "6"
+# SIGTERM and friends delivered on the main loop. Split out of glib in 0.22.
+glib-unix = "0.22"
 # v4_12 for CssProvider::load_from_string, which is what makes swapping the
 # accent colour and hot-reloading the user stylesheet cheap.
 gtk4 = { version = "0.11", features = ["v4_12"] }
