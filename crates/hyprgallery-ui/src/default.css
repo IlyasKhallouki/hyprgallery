@@ -1,0 +1,301 @@
+/* hyprgallery's built-in stylesheet.
+ *
+ * Override any of it in ~/.config/hyprgallery/style.css, which is loaded after
+ * this file and reloaded whenever it is saved. docs/THEMING.md lists the
+ * selectors.
+ *
+ * @hg_accent is replaced at runtime with a colour taken from whichever
+ * wallpaper is focused. The transitions on the rules that use it are what make
+ * that change a fade rather than a jump. To pin an accent, style the selectors
+ * that use it directly; see docs/THEMING.md. */
+
+@define-color hg_accent #e8b4bc;
+@define-color hg_accent_fg #141218;
+@define-color hg_text rgba(255, 255, 255, 0.92);
+@define-color hg_dim rgba(255, 255, 255, 0.58);
+@define-color hg_glass rgba(20, 18, 26, 0.84);
+
+window#hyprgallery,
+window#hyprgallery.background {
+  background: transparent;
+  color: @hg_text;
+}
+
+/* The full-screen layout. */
+.hg-content-box {
+  padding: 44px 76px 24px 76px;
+}
+
+.hg-header {
+  margin: 0 9px 16px 9px;
+}
+
+.hg-album {
+  min-height: 0;
+  padding: 7px 15px;
+  margin-right: 8px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: @hg_dim;
+  font-weight: 500;
+  transition: background-color 220ms ease-out, color 220ms ease-out;
+}
+
+.hg-album:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: @hg_text;
+}
+
+.hg-album.active {
+  background: @hg_accent;
+  color: @hg_accent_fg;
+}
+
+.hg-album-count {
+  margin-left: 7px;
+  opacity: 0.6;
+  font-size: 0.86em;
+  font-feature-settings: "tnum";
+}
+
+.hg-separator {
+  min-width: 1px;
+  margin: 6px 10px 6px 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+searchentry.hg-search {
+  min-width: 260px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: none;
+  outline: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.07);
+  color: @hg_text;
+  transition: background-color 200ms ease-out, outline-color 200ms ease-out;
+}
+
+searchentry.hg-search:focus-within {
+  background: rgba(255, 255, 255, 0.12);
+  outline-color: alpha(@hg_accent, 0.7);
+}
+
+.hg-hues {
+  margin: 0 9px 14px 9px;
+}
+
+.hg-hue {
+  min-height: 0;
+  padding: 5px 12px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: @hg_dim;
+  font-size: 0.92em;
+  transition: background-color 200ms ease-out, color 200ms ease-out;
+}
+
+.hg-hue:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: @hg_text;
+}
+
+.hg-hue.active {
+  background: rgba(255, 255, 255, 0.9);
+  color: #141218;
+}
+
+gridview.hg-grid,
+scrolledwindow.hg-grid-scroll {
+  background: transparent;
+}
+
+gridview.hg-grid > child {
+  padding: 9px;
+  background: transparent;
+  border-radius: 18px;
+  outline: none;
+}
+
+gridview.hg-grid > child:selected,
+gridview.hg-grid > child:hover {
+  background: transparent;
+}
+
+hg-tile {
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  outline: 3px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 240ms ease-out, box-shadow 240ms ease-out;
+}
+
+gridview.hg-grid > child:selected hg-tile {
+  outline-color: @hg_accent;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+
+.hg-empty {
+  margin-bottom: 60px;
+}
+
+.hg-empty-title {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: @hg_text;
+}
+
+.hg-empty-hint {
+  margin-top: 8px;
+  color: @hg_dim;
+}
+
+.hg-footer {
+  margin: 14px 9px 0 9px;
+  color: @hg_dim;
+  font-size: 0.9em;
+}
+
+.hg-key {
+  min-width: 14px;
+  padding: 1px 7px;
+  margin-right: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: @hg_text;
+  font-size: 0.84em;
+  font-weight: 700;
+}
+
+.hg-hint {
+  margin-right: 18px;
+}
+
+.hg-status {
+  color: @hg_dim;
+}
+
+.hg-status.busy {
+  color: @hg_accent;
+}
+
+menubutton.hg-rotate > button {
+  min-height: 0;
+  padding: 5px 12px;
+  margin-left: 14px;
+  border: none;
+  border-radius: 999px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: @hg_dim;
+}
+
+menubutton.hg-rotate > button:hover {
+  background: rgba(255, 255, 255, 0.13);
+  color: @hg_text;
+}
+
+menubutton.hg-rotate.active > button {
+  background: alpha(@hg_accent, 0.22);
+  color: @hg_accent;
+}
+
+/* Messages that come and go at the bottom. */
+.hg-toast {
+  margin-bottom: 70px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(10, 10, 14, 0.82);
+  color: @hg_text;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.hg-toast.error {
+  background: rgba(150, 30, 50, 0.92);
+}
+
+/* Shown while files are dragged over the gallery. */
+.hg-drop {
+  margin: 28px;
+  border: 2px dashed alpha(@hg_accent, 0.8);
+  border-radius: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.hg-drop label {
+  font-size: 1.4em;
+  font-weight: 700;
+}
+
+/* The popover layout: a panel hanging from the bar. */
+.hg-panel {
+  padding: 14px 12px 12px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: @hg_glass;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  color: @hg_text;
+}
+
+.hg-panel .hg-header {
+  margin: 0 6px 10px 6px;
+}
+
+.hg-panel searchentry.hg-search {
+  min-width: 0;
+}
+
+.hg-shelf {
+  margin-bottom: 10px;
+}
+
+.hg-shelf-item {
+  min-height: 0;
+  padding: 8px 6px 6px 6px;
+  margin-right: 4px;
+  border: none;
+  border-radius: 14px;
+  box-shadow: none;
+  background: transparent;
+  color: @hg_dim;
+  transition: background-color 200ms ease-out, color 200ms ease-out;
+}
+
+.hg-shelf-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: @hg_text;
+}
+
+.hg-shelf-item.active {
+  background: alpha(@hg_accent, 0.2);
+  color: @hg_text;
+}
+
+.hg-shelf-item label {
+  margin-top: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.hg-panel .hg-footer {
+  margin: 10px 6px 0 6px;
+}
+
+.hg-panel gridview.hg-grid > child {
+  padding: 6px;
+}
+
+.hg-panel hg-tile {
+  border-radius: 11px;
+}
+
+popover.menu > contents {
+  border-radius: 14px;
+}

@@ -1,0 +1,18 @@
+[package]
+name = "hyprgallery-ui"
+description = "The GTK4 layer-shell gallery for hyprgallery."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-channel.workspace = true
+gtk4.workspace = true
+gtk4-layer-shell.workspace = true
+hyprgallery-core.workspace = true
+tracing.workspace = true
