@@ -91,7 +91,7 @@ fn applying_reaches_the_backend_and_becomes_current() {
     assert_eq!(changes, [Change::Applying]);
     assert!(f.engine.status().applying);
     f.pump_until(|c, _| c.contains(&Change::Current));
-    assert_eq!(f.applied(), [earth.clone()]);
+    assert_eq!(f.applied(), std::slice::from_ref(&earth));
     assert_eq!(f.engine.state.current.as_deref(), Some(earth.as_path()));
     assert_eq!(f.engine.status().name.as_deref(), Some("Earth"));
 }

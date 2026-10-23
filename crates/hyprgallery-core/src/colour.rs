@@ -83,7 +83,7 @@ impl Hue {
 
     pub fn of(c: Rgb) -> Self {
         let (h, s, l) = c.hsl();
-        if s < 0.16 || l < 0.07 || l > 0.95 {
+        if s < 0.16 || !(0.07..=0.95).contains(&l) {
             return Hue::Mono;
         }
         match h {

@@ -30,6 +30,9 @@ pub const NAMESPACE: &str = "hyprgallery";
 /// to the bar, and back into the gallery.
 pub type Dispatch = Rc<dyn Fn(Vec<Change>)>;
 
+/// What a menu action does with the gallery and its parameter.
+type ActionFn = Box<dyn Fn(&Rc<Gallery>, Option<&glib::Variant>)>;
+
 /// One grid entry. Indexes into the library, which is rebuilt rather than
 /// edited, so the store is refilled whenever the library changes.
 #[derive(Debug, Clone)]
@@ -1550,9 +1553,7 @@ impl Gallery {
 
     fn wire_actions(self: &Rc<Self>) {
         let tile_actions = gio::SimpleActionGroup::new();
-        let add = |name: &str,
-                   param: Option<&glib::VariantTy>,
-                   f: Box<dyn Fn(&Rc<Gallery>, Option<&glib::Variant>)>| {
+        let add = |name: &str, param: Option<&glib::VariantTy>, f: ActionFn| {
             let action = gio::SimpleAction::new(name, param);
             let weak = self.weak();
             action.connect_activate(move |_, p| {
