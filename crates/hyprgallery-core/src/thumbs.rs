@@ -46,6 +46,20 @@ impl Meta {
     pub fn accent(&self) -> Rgb {
         colour::accent(self.colour)
     }
+
+    /// The backdrop the gallery stretches across the screen.
+    ///
+    /// Upscaled and blurred here, once, on a worker thread, so the GPU only
+    /// ever stretches an image that is already smooth. Stretching the tiny
+    /// copy directly shows the bilinear seams, and blurring at draw time costs
+    /// a full-screen blur pass on every frame of a crossfade.
+    pub fn backdrop(&self) -> Option<Rgb8> {
+        let tiny = Rgb8 { width: TINY_W, height: TINY_H, data: self.tiny_rgb()? };
+        let up = decode::squash(&tiny, 320, 180);
+        let buf = image::RgbImage::from_raw(up.width, up.height, up.data)?;
+        let blurred = image::imageops::blur(&buf, 5.0);
+        Some(Rgb8 { width: 320, height: 180, data: blurred.into_raw() })
+    }
 }
 
 pub fn thumb_path(cache_dir: &Path, key: &str) -> PathBuf {
